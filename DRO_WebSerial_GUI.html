@@ -1,0 +1,627 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>DRO Web Serial</title>
+<style>
+:root {
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --text: #111827;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --accent: #111827;
+  --green: #16a34a;
+  --red: #dc2626;
+  --shadow: 0 14px 40px rgba(15,23,42,0.08);
+  --radius: 24px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  background: radial-gradient(circle at top left,#ffffff 0,#f6f7fb 50%,#eef2ff 100%);
+  color: var(--text);
+}
+.wrap { max-width: 1050px; margin: 0 auto; padding: 22px; }
+.top  { display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-bottom:18px; }
+.pill {
+  border:1px solid var(--line); background:rgba(255,255,255,0.85);
+  border-radius:999px; padding:9px 12px; color:var(--muted); font-size:13px; white-space:nowrap;
+}
+.pill.running { background:#dcfce7; color:#166534; border-color:#86efac; font-weight:850; }
+.serialBtn { border-radius:999px; padding:9px 12px; font-size:13px; background:#111827; color:white; }
+.grid { display:grid; grid-template-columns:1.2fr 1fr; gap:20px; align-items:start; }
+.card {
+  background:rgba(255,255,255,0.94); border:1px solid rgba(229,231,235,0.95);
+  border-radius:var(--radius); box-shadow:var(--shadow); padding:24px; backdrop-filter:blur(12px);
+}
+.card.runningCard { border-color:#86efac; box-shadow:0 14px 44px rgba(22,163,74,0.16); }
+.positionCard { text-align:center; padding-top:30px; padding-bottom:30px; }
+.positionCard.simplified { min-height:420px; }
+.positionCard.simplified .liveSpeedBox { display:none; }
+.label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.09em; font-weight:800; }
+.mainValue {
+  font-variant-numeric:tabular-nums;
+  font-size:clamp(60px,13vw,118px); font-weight:900; letter-spacing:-0.03em;
+  line-height:0.95; margin:10px 0 14px;
+}
+.unit { font-size:24px; color:var(--muted); font-weight:750; margin-left:8px; }
+.copyBtn {
+  padding:2px 6px; border-radius:7px; font-size:11px; margin-left:4px;
+  vertical-align:middle; background:#ffffff; color:#6b7280;
+  border:1px solid #d1d5db; min-width:auto; line-height:1;
+}
+.liveSpeedBox { margin-top:28px; padding-top:20px; border-top:1px solid var(--line); text-align:center; }
+.liveSpeedValue {
+  font-variant-numeric:tabular-nums;
+  font-size:clamp(30px,6vw,52px); font-weight:850; letter-spacing:-0.02em; margin-top:6px;
+}
+.liveSpeedValue .unit { font-size:18px; }
+.row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:28px; }
+button,select,input {
+  appearance:none; border-radius:18px; padding:15px 16px; font-weight:850; font-size:15px;
+}
+button { border:0; background:var(--accent); color:white; cursor:pointer; }
+select,input { background:#ffffff; color:var(--text); border:1px solid var(--line); width:100%; }
+input { cursor:text; font-variant-numeric:tabular-nums; }
+button:focus-visible,select:focus,input:focus {
+  outline:2px solid rgba(30,58,138,0.22); outline-offset:2px;
+}
+.secondary { background:#eef2ff; color:#1e3a8a; }
+.green { background:var(--green); }
+.red   { background:var(--red); }
+.light { background:#ffffff; color:var(--text); border:1px solid var(--line); }
+.iconBtn { font-size:21px; line-height:1; padding:10px; }
+.testHeader { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:8px; }
+.testTitle  { font-size:22px; font-weight:800; }
+.headerMeta { width:100%; max-width:170px; display:flex; flex-direction:column; align-items:stretch; }
+.headerProgressTrack { height:4px; background:#e9edf5; border-radius:999px; overflow:hidden; }
+.headerProgressFill  {
+  height:100%; width:0%; background:var(--accent); border-radius:999px; transition:width 0.12s linear;
+}
+.runningCard .headerProgressFill { background:var(--green); }
+.targetBox  { display:block; margin-top:12px; }
+.testButtons { display:grid; grid-template-columns:minmax(0,1fr) 72px; gap:8px; margin-top:12px; }
+.testButtons button { padding:13px 12px; font-size:14px; border-radius:15px; }
+.testButtons .iconBtn { font-size:19px; }
+.actionBtn { width:100%; }
+.miniStatus { color:var(--muted); font-size:13px; margin:0 0 6px; font-weight:700; text-align:right; }
+.resultBlock { margin-top:16px; padding-top:16px; border-top:1px solid var(--line); }
+.speedRow { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-top:8px; }
+.resultSpeed {
+  font-variant-numeric:tabular-nums;
+  font-size:clamp(34px,8vw,62px); font-weight:850; letter-spacing:-0.05em; line-height:0.95;
+}
+.inlineError {
+  text-align:right; color:var(--muted); font-size:13px;
+  line-height:1.25; white-space:nowrap; font-variant-numeric:tabular-nums; padding-top:8px;
+}
+.inlineErrorValue { display:block; margin-top:3px; color:#4b5563; font-size:20px; font-weight:800; }
+.inlineErrorValue.missing { color:#9ca3af; font-weight:700; }
+.metricGrid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:18px; }
+.metricValue {
+  font-size:clamp(24px,5vw,42px); font-weight:850; letter-spacing:-0.03em;
+  line-height:1; margin-top:8px; font-variant-numeric:tabular-nums;
+}
+.valueWrap { display:flex; flex-direction:column; align-items:flex-start; }
+.copyUnder { margin-top:10px; }
+.tiny { color:var(--muted); font-size:13px; margin-top:6px; line-height:1.35; font-variant-numeric:tabular-nums; }
+.footer { margin-top:20px; color:var(--muted); font-size:12px; text-align:center; line-height:1.45; }
+@media (max-width:780px) {
+  .grid,.row,.metricGrid { grid-template-columns:1fr; }
+  .testHeader { flex-wrap:wrap; }
+  .headerMeta { width:100%; max-width:none; flex-basis:100%; }
+  .speedRow { flex-direction:column; }
+  .miniStatus,.inlineError { text-align:left; padding-top:0; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <button class="serialBtn" id="connectBtn" onclick="connectSerial()">Connect USB</button>
+  <div class="pill" id="status">USB disconnected</div>
+</div>
+
+<div class="grid">
+
+<div class="card positionCard" id="positionCard">
+  <div>
+    <span class="mainValue" id="pos">0.0000</span>
+    <span class="unit" id="unit">in</span>
+    <button class="copyBtn" onclick="copyVal('pos')">⧉</button>
+  </div>
+  <div class="row">
+    <button onclick="cmd('ZERO')">ZERO</button>
+    <button class="secondary" onclick="toggleUnits()">Toggle in / mm</button>
+  </div>
+  
+<div style="margin-top:10px">
+  <button class="secondary" id="scaleBtn" onclick="toggleScale()"
+    style="width:100%;display:flex;align-items:center;justify-content:center;gap:9px;padding:12px 16px">
+    <span id="scaleSmBox" style="display:inline-block;width:8px;height:12px;background:currentColor;border-radius:2px;opacity:0.3;flex-shrink:0"></span>
+    <span id="scaleLgBox" style="display:inline-block;width:18px;height:12px;background:currentColor;border-radius:2px;flex-shrink:0"></span>
+    <span id="scaleLabel">Big &middot; 0.01mm</span>
+  </button>
+</div>
+<div class="liveSpeedBox">
+    <div class="label">Live Speed</div>
+    <div class="liveSpeedValue">
+      <span id="liveSpeed">0.0000</span>
+      <span class="unit" id="liveSpeedUnit">in/min</span>
+    </div>
+  </div>
+</div>
+
+<div class="card testCard" id="testCard">
+
+  <div class="testHeader">
+    <div class="testTitle">Speed Test</div>
+    <div class="headerMeta">
+      <div class="miniStatus" id="testState">Idle</div>
+      <div aria-label="Speed test progress">
+        <div class="headerProgressTrack">
+          <div class="headerProgressFill" id="testProgressFill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tiny">Duration</div>
+  <select id="duration" onchange="setDuration()">
+    <option value="1">1 minute</option>
+    <option value="2" selected>2 minutes</option>
+    <option value="3">3 minutes</option>
+    <option value="4">4 minutes</option>
+    <option value="5">5 minutes</option>
+    <option value="6">6 minutes</option>
+    <option value="7">7 minutes</option>
+    <option value="8">8 minutes</option>
+    <option value="9">9 minutes</option>
+    <option value="10">10 minutes</option>
+  </select>
+
+  <div class="targetBox">
+    <div class="tiny">Target speed</div>
+    <input id="targetSpeed" type="number" min="0" step="1.000"
+           placeholder="optional"
+           onchange="setTargetSpeed()" onblur="setTargetSpeed()"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();event.target.blur()}">
+  </div>
+
+  <div class="testButtons">
+    <button class="green actionBtn" id="actionBtn" onclick="toggleTest()">Start</button>
+    <button class="light iconBtn" title="Reset" onclick="cmd('RESET')">↻</button>
+  </div>
+
+  <div class="resultBlock">
+    <div class="label">Test Speed</div>
+    <div class="speedRow">
+      <div class="valueWrap">
+        <div>
+          <span class="resultSpeed" id="resultSpeed">--</span>
+          <span class="unit" id="resultUnit">in/min</span>
+        </div>
+        <button class="copyBtn copyUnder" onclick="copyVal('resultSpeed')">⧉</button>
+      </div>
+      <div class="inlineError">
+        <span>Percent error</span>
+        <span class="inlineErrorValue missing" id="percentError">--</span>
+      </div>
+    </div>
+
+    <div class="metricGrid">
+      <div>
+        <div class="label">Distance</div>
+        <div class="valueWrap">
+          <div class="metricValue">
+            <span id="testDist">--</span>
+            <span class="unit" id="testDistUnit">in</span>
+          </div>
+          <button class="copyBtn copyUnder" onclick="copyVal('testDist')">⧉</button>
+        </div>
+      </div>
+      <div>
+        <div class="label">Elapsed</div>
+        <div class="valueWrap">
+          <div class="metricValue">
+            <span id="testTime">--</span>
+            <span class="unit">s</span>
+          </div>
+          <button class="copyBtn copyUnder" onclick="copyVal('testTime')">⧉</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div class="footer">
+  <b>USB Web Serial</b> · START/STOP: <b>D6 / GPIO21</b> · RESET: <b>D7 / GPIO20</b>
+</div>
+</div>
+
+<script>
+"use strict";
+let currentUnit = "in";
+
+// ---- Request serializer -----------------------------------------------
+// One request in-flight at a time. Prevents concurrent HTTP requests from
+// overwhelming the ESP32's single-threaded WebServer (root cause of the
+// intermittent "sometimes it works" behaviour).
+let busy = false;
+
+// ---- Audio -----------------------------------------------
+// Web Audio API — generates tones directly in the browser.
+// No external files needed, works offline on the ESP32 AP.
+//
+// Why the original version stopped working:
+//   Browsers suspend AudioContext after a period of silence. The old
+//   ensureAudio() called resume() but didn't await it, so the context
+//   was still suspended when tones were scheduled — they silently dropped.
+//
+// Fix: playDoneSound() is async and awaits resume() before scheduling
+// anything. ensureAudio() is still called on every button press (user
+// gesture) to keep the context as warm as possible, but playDoneSound()
+// handles the suspended case reliably on its own.
+let audioCtx = null;
+
+function ensureAudio() {
+  if (audioCtx && audioCtx.state === "closed") audioCtx = null;
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e) {}
+  }
+  // Best-effort resume during a user gesture — does NOT need to be awaited here
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+}
+
+async function playDoneSound() {
+  try {
+    // Recreate if the context was closed
+    if (audioCtx && audioCtx.state === "closed") audioCtx = null;
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // AWAIT the resume so we know the context is actually running
+    // before scheduling any nodes. This is the fix for the "sound stops
+    // working after a while" bug — the context gets suspended during the
+    // 2-minute test and the old code fired tones while it was still asleep.
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+    if (audioCtx.state !== "running") return;
+
+    const ctx = audioCtx;
+    const t   = ctx.currentTime;
+
+    // Arrow function avoids the 'function' keyword that the Arduino IDE
+    // preprocessor picks up inside raw string literals when generating
+    // C++ prototypes, which caused the compile error.
+    const tone = (freq, start, dur, vol) => {
+      const osc = ctx.createOscillator();
+      const g   = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      osc.connect(g);
+      g.connect(ctx.destination);
+      g.gain.setValueAtTime(0, start);
+      g.gain.linearRampToValueAtTime(vol, start + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+      osc.start(start);
+      osc.stop(start + dur + 0.02);
+    };
+
+    tone(660, t,        0.18, 0.25);
+    tone(880, t + 0.21, 0.32, 0.20);
+  } catch(e) {}
+}
+
+function withTimeout(p, ms = 2500) {
+  return new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error("timeout")), ms);
+    p.then(v => { clearTimeout(t); res(v); },
+           e => { clearTimeout(t); rej(e); });
+  });
+}
+
+// ---- Formatters -------------------------------------------------------
+function fmt(v, d)    { return isFinite(v) ? Number(v).toFixed(d) : "--"; }
+function fmtAbs(v, d) { return isFinite(v) ? Math.abs(Number(v)).toFixed(d) : "--"; }
+
+function fmtInches(v, decimals = 4) {
+  let x = Number(v);
+  if (!isFinite(x)) return "--";
+  const sign = x < 0 ? "-" : "";
+  x = Math.abs(x);
+
+  // Inch displays should always land on a value whose last decimal digit is
+  // 0 or 5.  That means nearest 0.0005" on the big/long scale (4 places)
+  // and nearest 0.00005" on the small/short scale (5 places).
+  const scale = Math.pow(10, decimals);
+  const steps = Math.round(x * scale / 5);
+  const whole = Math.floor((steps * 5) / scale);
+  const frac  = (steps * 5) % scale;
+  return sign + whole + "." + String(frac).padStart(decimals, "0");
+}
+
+function fmtInchesAbs(v, decimals = 4) {
+  let x = Math.abs(Number(v));
+  return fmtInches(x, decimals);
+}
+
+function fmtAbsPercent(v) {
+  const x = Math.abs(Number(v));
+  return isFinite(x) ? x.toFixed(2) + "%" : "--";
+}
+
+function clamp01(v) {
+  const x = Number(v);
+  return isFinite(x) ? Math.max(0, Math.min(1, x)) : 0;
+}
+
+function targetDec() { return currentUnit === "in" ? 4 : 2; }
+function fmtTarget(v) {
+  const x = Number(v);
+  return (isFinite(x) && Math.abs(x) > 1e-7) ? x.toFixed(targetDec()) : "";
+}
+
+function copyVal(id) {
+  const t = document.createElement("textarea");
+  t.value = document.getElementById(id).textContent;
+  t.style.cssText = "position:fixed;left:-9999px";
+  document.body.appendChild(t);
+  t.focus(); t.select();
+  try { document.execCommand("copy"); } catch(e) {}
+  document.body.removeChild(t);
+}
+
+// ---- UI update ---------------------------------------------------------
+// Track previous running state so we can detect the RUNNING → HELD
+// transition and fire the done sound exactly once per completed test.
+let prevRunning = false;
+let smallScale   = false;
+
+function applyData(d) {
+  // Fire chime the moment the test locks into HELD.
+  // Guard with prevRunning so a browser reconnect after an already-held
+  // test doesn't re-trigger the sound.
+  if (d.test_held && prevRunning) playDoneSound();
+  prevRunning = d.test_running;
+
+  // Scale type selector
+  smallScale = d.small_scale;
+  document.getElementById("scaleSmBox").style.opacity = smallScale ? "1"   : "0.3";
+  document.getElementById("scaleLgBox").style.opacity  = smallScale ? "0.3" : "1";
+  document.getElementById("scaleLabel").textContent    = smallScale ? "Small \u00b7 0.001mm" : "Big \u00b7 0.01mm";
+  currentUnit = d.unit;
+
+  const running = d.test_running;
+  const held    = d.test_held;
+  const active  = running || held;
+
+  // Status pill
+  const pill = document.getElementById("status");
+  pill.className = running ? "pill running" : "pill";
+  pill.textContent = !d.haveReading ? "waiting for scale"
+                   : running        ? "TEST RUNNING"
+                   : held           ? "result held"
+                   : "live";
+
+  // Cards
+  document.getElementById("testCard").className =
+    running ? "card testCard runningCard" : "card testCard";
+  document.getElementById("positionCard").className =
+    active ? "card positionCard simplified" : "card positionCard";
+
+  // Test state badge + action button
+  const btn = document.getElementById("actionBtn");
+  if (running) {
+    document.getElementById("testState").textContent = "Running";
+    btn.textContent = "Stop";
+    btn.className   = "red actionBtn";
+    btn.dataset.mode = "stop";
+  } else if (held) {
+    document.getElementById("testState").textContent = "Complete";
+    btn.textContent = "Start";
+    btn.className   = "green actionBtn";
+    btn.dataset.mode = "start";
+  } else {
+    document.getElementById("testState").textContent = "Idle";
+    btn.textContent = "Start";
+    btn.className   = "green actionBtn";
+    btn.dataset.mode = "start";
+  }
+
+  // Progress bar
+  document.getElementById("testProgressFill").style.width =
+    fmt(clamp01(d.test_progress) * 100, 1) + "%";
+
+  // Duration selector
+  document.getElementById("duration").value = String(d.duration_min);
+
+  // Target speed input (don't overwrite while user is typing)
+  const ti = document.getElementById("targetSpeed");
+  if (document.activeElement !== ti) {
+    ti.value = d.has_target_speed
+      ? fmtTarget(d.unit === "in" ? d.target_speed_in_min : d.target_speed_mm_min)
+      : "";
+  }
+
+  // Percent error
+  const pe = document.getElementById("percentError");
+  if (d.has_target_speed && active) {
+    pe.textContent = fmtAbsPercent(d.test_percent_error);
+    pe.className   = "inlineErrorValue";
+  } else {
+    pe.textContent = "--";
+    pe.className   = "inlineErrorValue missing";
+  }
+
+  // Live position (left card)
+  if (d.unit === "in") {
+    document.getElementById("pos").textContent          = fmtInches(d.rel_in, smallScale ? 5 : 4);
+    document.getElementById("unit").textContent         = "in";
+    document.getElementById("liveSpeed").textContent    = fmt(d.live_speed_in_min, 4);
+    document.getElementById("liveSpeedUnit").textContent = "in/min";
+  } else {
+    document.getElementById("pos").textContent          = fmt(d.rel_mm, smallScale ? 3 : 2);
+    document.getElementById("unit").textContent         = "mm";
+    document.getElementById("liveSpeed").textContent    = fmt(d.live_speed_mm_min, 2);
+    document.getElementById("liveSpeedUnit").textContent = "mm/min";
+  }
+
+  // Test result panel — show "--" in idle, real values during/after
+  if (!active) {
+    document.getElementById("resultSpeed").textContent = "--";
+    document.getElementById("testDist").textContent    = "--";
+    document.getElementById("testTime").textContent    = "--";
+  } else if (d.unit === "in") {
+    document.getElementById("resultSpeed").textContent = fmtAbs(d.test_speed_in_min, 4);
+    document.getElementById("resultUnit").textContent  = "in/min";
+    document.getElementById("testDist").textContent    = fmtInchesAbs(d.test_distance_in, smallScale ? 5 : 4);
+    document.getElementById("testDistUnit").textContent = "in";
+    // Elapsed: 4 decimal places so the frame-window value is distinguishable
+    // from a round configured duration (e.g. 59.9872 s vs 60.0000 s)
+    document.getElementById("testTime").textContent    = fmt(d.test_elapsed_s, 4);
+  } else {
+    document.getElementById("resultSpeed").textContent = fmtAbs(d.test_speed_mm_min, 3);
+    document.getElementById("resultUnit").textContent  = "mm/min";
+    document.getElementById("testDist").textContent    = fmtAbs(d.test_distance_mm, smallScale ? 3 : 2);
+    document.getElementById("testDistUnit").textContent = "mm";
+    document.getElementById("testTime").textContent    = fmt(d.test_elapsed_s, 4);
+  }
+}
+
+// ---- Web Serial --------------------------------------------------------
+let port = null;
+let reader = null;
+let writer = null;
+let readBuffer = "";
+let lastPacketMs = 0;
+
+function setUsbStatus(text) {
+  const pill = document.getElementById("status");
+  pill.className = "pill";
+  pill.textContent = text;
+}
+
+async function connectSerial() {
+  if (!("serial" in navigator)) {
+    setUsbStatus("Web Serial not supported");
+    alert("Web Serial needs Chrome or Edge on desktop. If opening as a file does not work, serve this HTML from http://localhost.");
+    return;
+  }
+
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+
+    const encoder = new TextEncoderStream();
+    encoder.readable.pipeTo(port.writable);
+    writer = encoder.writable.getWriter();
+
+    document.getElementById("connectBtn").textContent = "Reconnect USB";
+    setUsbStatus("USB connected");
+    lastPacketMs = Date.now();
+
+    readLoop();
+  } catch(e) {
+    setUsbStatus("USB connect failed");
+  }
+}
+
+async function readLoop() {
+  const decoder = new TextDecoderStream();
+  const readableClosed = port.readable.pipeTo(decoder.writable);
+  reader = decoder.readable.getReader();
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      readBuffer += value;
+
+      let nl;
+      while ((nl = readBuffer.indexOf("\n")) >= 0) {
+        const line = readBuffer.slice(0, nl).trim();
+        readBuffer = readBuffer.slice(nl + 1);
+        if (!line || line[0] !== "{") continue; // ignore boot/debug text
+        try {
+          const d = JSON.parse(line);
+          lastPacketMs = Date.now();
+          applyData(d);
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    setUsbStatus("USB disconnected");
+  } finally {
+    try { reader.releaseLock(); } catch(e) {}
+    try { await readableClosed; } catch(e) {}
+  }
+}
+
+async function sendSerial(line) {
+  ensureAudio();
+  if (!writer) {
+    setUsbStatus("click Connect USB");
+    return;
+  }
+  try {
+    await writer.write(line + "\n");
+  } catch(e) {
+    setUsbStatus("USB write failed");
+  }
+}
+
+async function cmd(command) {
+  await sendSerial(command);
+}
+
+async function toggleTest() {
+  const mode = document.getElementById("actionBtn").dataset.mode;
+  await cmd(mode === "stop" ? "STOP" : "START");
+}
+
+async function toggleScale() {
+  await cmd("SCALE " + (smallScale ? "0" : "1"));
+}
+
+async function toggleUnits() {
+  await cmd("UNIT " + (currentUnit === "in" ? "mm" : "in"));
+}
+
+async function setDuration() {
+  await cmd("DURATION " + document.getElementById("duration").value);
+}
+
+async function setTargetSpeed() {
+  const input = document.getElementById("targetSpeed");
+  let v = parseFloat(input.value);
+  if (!isFinite(v) || v < 0) v = 0;
+  await cmd("TARGET " + v + " " + currentUnit);
+}
+
+setInterval(() => {
+  if (writer && Date.now() - lastPacketMs > 1500) setUsbStatus("USB connected · no data");
+}, 500);
+
+// ---- Keyboard shortcut ----------------------------------------
+// Alt+S (Windows/Linux) or Option+S (Mac) — start or stop the test.
+// Uses event.code (physical key position) so it works on all keyboard
+// layouts regardless of what character Option/Alt+S produces.
+document.addEventListener("keydown", e => {
+  if (e.altKey && e.code === "KeyS") {
+    e.preventDefault();
+    ensureAudio();   // counts as a user gesture — keeps audio context warm
+    toggleTest();
+  }
+});
+
+</script>
+</body>
+</html>
