@@ -26,8 +26,8 @@ const int64_t  SCALE_STALE_US  = 5000000LL; // 5 s
 // ==================== Mitutoyo SPC protocol ====================
 // asserting REQ (via MOSFET) causes the scale to clock out 13 nibbles.
 // We sample DATA after each falling CLOCK edge.
-// Timeout per clock edge: 2 ms — generous for Mitutoyo (~100–500 kHz clock)
-// but keeps worst-case blocking to ~208 ms if scale is unresponsive.
+// Timeout per clock edge: 200 ms — gives the scale plenty of time to begin
+// clocking after REQ assertion. Worst-case blocking per failed frame: ~200 ms.
 
 static uint8_t mitoNib[13];
 
@@ -236,6 +236,7 @@ void cmdReset() {
   resultDistanceMm = 0.0f;
   resultElapsedSec = 0.0f;
   testStartUs      = 0;
+  liveSpeedMmMin   = 0.0f;   // clear EMA so live speed display resets immediately
   pulseReset();
 }
 
